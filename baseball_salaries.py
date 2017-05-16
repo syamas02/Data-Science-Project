@@ -7,14 +7,10 @@ Project:  MLB Statistical Analysis
 
 import requests
 from bs4 import BeautifulSoup
-import csv
 import matplotlib.pyplot as plt
 import pandas as pd
-import brewer2mpl
-import numpy as np
-import random as rand
 import re
-
+import folium
 
 years = list(range(2000,2017))
 print(years)
@@ -71,24 +67,21 @@ for year in years:
     del position_list[:]
     del salary_list[:]
 
-print(fname_dict.items())
+
+
 df_m = pd.read_csv('Master.csv')
 df_b = pd.read_csv('Batting.csv')
 
 
-#print(data_df['weight'])
-
-## inner joined 2 dataframes 
+## inner joined 2 dataframes from Master.csv and Batting.csv based on playerID
 df_c = pd.merge(df_m, df_b, on='playerID', how='inner')
 
 #sorted based on year descending
-#df_s = df_c.sort(['yearID'], ascending=[False])
 df_s = df_c.sort_values(['yearID'], ascending=[False])
-set2 = brewer2mpl.get_map('Set2', 'qualitative', 6).mpl_colors
-
 
 for year in years:
     data = df_s[df_s.yearID == year] 
+    df_sm = df_s[df_s.birthCountry == 'USA']
     plt.scatter(data['weight'], data['height'], alpha=0.5)
     plt.title("Height VS Weight for MLB players in "+ str(year))       #Title for plot
     plt.xlabel('Weight (lb)')                     #Label for x-axis
@@ -102,4 +95,52 @@ for year in years:
     plt.show()
 
 
+##shading cloropleth based on frequency of baseball players born in a USA
+lst= []
+states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", 
+          "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+          "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+          "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+          "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+df_s['freq'] = df_s.groupby('birthState')['birthState'].transform('count')
+
+for state in states:
+    if any(df_s.birthState == state):
+       lst.append(df_s.loc[df_s['birthState'] == state, 'freq'].iloc[0])
+    else:
+        lst.append(0)
+#checking for Puerto Rico       
+lst.append((df_s['birthCountry'] == "P.R.").sum())
+states.append("PR")
+
+print(len(lst))
+sales = [('birthState', states),
+         ('freq', lst)]
+df5 = pd.DataFrame.from_items(sales)
+print(df5)
+
+stateMap = folium.Map(location=[41, -97], zoom_start=4)
+stateMap.choropleth(geo_path="state4.json",
+                     fill_color='YlOrRd', fill_opacity=0.5, line_opacity=0.5,
+                     data = df5,
+                     key_on='feature.properties.STUSPS10',
+                     columns = ["birthState","freq"]
+                     ) 
+stateMap.save(outfile='stateMLB.html')
+
+#Read in the test scores
+#fullData = pd.read_csv('math2013.csv', skiprows = 6)
+#
+##Create a map:
+#schoolMap = folium.Map(location=[40.75, -74.125])
+#
+##Create a layer, shaded by test scores:
+#schoolMap.choropleth(geo_path="schoolDistricts.json",
+#                     fill_color='YlGnBu', fill_opacity=0.5, line_opacity=0.5,
+#                     data = fullData,
+#                     key_on='feature.properties.SchoolDist',
+#                     columns = ["district", "%.4"]
+#                     ) 
+##Output the map to an .html file:
+#schoolMap.save(outfile='district_math_proficient.html')
 
